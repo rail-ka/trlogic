@@ -1,0 +1,33 @@
+[package]
+name = "trlogic"
+description = "TR Logic homework"
+version = "0.1.0"
+authors = ["Rail Khusnutdinov <mail@rail-ka.ru>"]
+edition = "2018"
+homepage = "https://github.com/rail-ka/trlogic"
+repository = "https://github.com/rail-ka/trlogic"
+readme = "README.md"
+travis-ci = { repository = "rail-ka/trlogic", branch = "master" }
+
+[[bin]]
+name = "trlogic"
+path = "src/main.rs"
+
+[dependencies]
+futures = "0.1"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+#actix-web = { version = "1.0.3", features = ["rust-tls"] }
+actix-web = { version = "1.0.3", features = ["ssl"] }
+actix-multipart = "0.1"
+actix-files = "0.1"
+json = "0.11"
+base64 = "0.10"
+image = "0.21"
+bytes = "0.4"
+log = { version = "0.4" }
+env_logger = "0.6"
+
+#[patch.crates-io]
+#actix-web = { path = "actix-web" }
