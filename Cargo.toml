@@ -29,5 +29,8 @@ bytes = "0.4"
 log = { version = "0.4" }
 env_logger = "0.6"
 
+[dev-dependencies]
+tokio = "0.1"
+
 #[patch.crates-io]
 #actix-web = { path = "actix-web" }

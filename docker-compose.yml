@@ -6,4 +6,4 @@ services:
     environment:
       - RUST_LOG=info
     volumes:
-      - "/root/${CLIENT}:/usr/src/app/config"
+      - "$(pwd):/usr/src/trlogic"
