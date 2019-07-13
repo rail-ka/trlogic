@@ -1,18 +1,30 @@
-FROM rust:1.36
+FROM ekidd/rust-musl-builder:1.36.0-openssl11 AS builder
 MAINTAINER Rail Khusnutdinov <mail@rail-ka.ru>
 ARG BUILD_DATE
 LABEL tags="latest 0.1" \
       build_date=$BUILD_DATE \
       maintainer="Rail Khusnutdinov <mail@rail-ka.ru>"
 
-WORKDIR /usr/src/trlogic
-
+COPY Cargo.toml ./Cargo.toml
+COPY Cargo.lock ./Cargo.lock
+COPY index.html ./index.html
+COPY image.json ./image.json
 COPY src ./src
-COPY Cargo.toml ./src/Cargo.toml
-COPY Cargo.lock ./src/Cargo.lock
-COPY index.html ./src/index.html
-COPY image.json ./src/image.json
 
-RUN cargo install --path .
+RUN sudo chown -R rust:rust /home/rust
 
-CMD ["trlogic"]
+RUN cargo build --release
+
+FROM alpine:3.10
+MAINTAINER Rail Khusnutdinov <mail@rail-ka.ru>
+ARG BUILD_DATE
+LABEL tags="latest 0.1" \
+      build_date=$BUILD_DATE \
+      maintainer="Rail Khusnutdinov <mail@rail-ka.ru>"
+RUN apk update && apk upgrade
+RUN apk --no-cache add ca-certificates
+EXPOSE 8080
+COPY --from=builder \
+    /home/rust/src/target/x86_64-unknown-linux-musl/release/trlogic \
+    /usr/local/bin/
+CMD /usr/local/bin/trlogic

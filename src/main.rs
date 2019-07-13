@@ -9,6 +9,7 @@ use actix_web::client::Connector;
 use actix_web::http::header::{DispositionParam, DispositionType::FormData};
 use actix_web::web::{get, post, Form, Json};
 use actix_web::{error, App, Error, HttpResponse, HttpServer, Responder};
+use chrono::Utc;
 use futures::{Future, Stream};
 use image::{DynamicImage, FilterType::Nearest};
 use std::time::Duration;
@@ -35,13 +36,14 @@ fn json_img() -> impl Responder {
 /// resize image to 100x100 and save both
 fn resize_and_save(img: DynamicImage, name: String) -> (bool, bool) {
     let small = img.resize(100, 100, Nearest);
-    let save_res = img.save(format!("{}.png", name));
+    let timestamp = Utc::now().timestamp();
+    let save_res = img.save(format!("images/{}-{}.png", name, timestamp));
     let mut a = (false, false);
     match save_res {
         Ok(_) => a.0 = true,
         Err(e) => error!(target: "resize_and_save", "{}", e.to_string()),
     }
-    let save_small_res = small.save(format!("{}_small.png", name));
+    let save_small_res = small.save(format!("images/{}_small-{}.png", name, timestamp));
     match save_small_res {
         Ok(_) => a.1 = true,
         Err(e) => error!(target: "resize_and_save", "{}", e.to_string()),
@@ -80,18 +82,12 @@ fn upload_from_multipart(multipart: Multipart) -> impl Future<Item = HttpRespons
             //            Ok(HttpResponse::Ok())
             let mut name = "img".to_string();
             if let Some(content_disposition) = field.content_disposition() {
-                match content_disposition.disposition {
-                    FormData => {
-                        for x in content_disposition.parameters {
-                            match x {
-                                DispositionParam::Name(param_name) => {
-                                    name = param_name;
-                                }
-                                _ => {}
-                            }
+                if let FormData = content_disposition.disposition {
+                    for x in content_disposition.parameters {
+                        if let DispositionParam::Name(param_name) = x {
+                            name = param_name;
                         }
                     }
-                    _ => {}
                 }
             }
             field
@@ -123,16 +119,16 @@ fn upload_from_url(req: Form<BodyWithUrl>) -> impl Future<Item = HttpResponse, E
         .connector(connector)
         .timeout(Duration::new(1000, 0))
         .finish();
-    // TODO: тут тесты обрубаются зачем то((
+    // тут тесты крашатся зачем то
     client
         .get(url)
         .send()
-        .map_err(|err| error::ErrorInternalServerError(err))
+        .map_err(error::ErrorInternalServerError)
         .and_then(|mut res| {
             println!("image getted");
             let body = res.body().limit(10_000_000);
             println!("body created");
-            body.map_err(|err| error::ErrorInternalServerError(err))
+            body.map_err(error::ErrorInternalServerError)
                 .and_then(|data| match image::load_from_memory(&data[..]) {
                     Ok(img) => {
                         println!("img created");
@@ -171,74 +167,78 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use actix_http::http::{HeaderMap, HeaderName, HeaderValue};
     use actix_web::http;
     use actix_web::test;
     use actix_web::FromRequest;
-    use futures;
+    use bytes::Bytes;
     use std::fs;
-    use tokio;
 
-    //    #[test]
-    //    fn resize_and_save_test() {
-    //        match fs::read("./img.jpg") {
-    //            Ok(file) => match image::load_from_memory(&file) {
-    //                Ok(img) => {
-    //                    assert_eq!(resize_and_save(img, "img".to_string()), (true, true));
-    //                    fs::remove_file("./img.png").unwrap();
-    //                    fs::remove_file("./img_small.png").unwrap();
-    //                }
-    //                Err(e) => panic!("{}", e),
-    //            },
-    //            Err(e) => panic!("{}", e),
-    //        }
-    //    }
+    #[test]
+    fn resize_and_save_test() {
+        match fs::read("./img.jpg") {
+            Ok(file) => match image::load_from_memory(&file) {
+                Ok(img) => {
+                    assert_eq!(resize_and_save(img, "img".to_string()), (true, true));
+                    fs::remove_file("./img.png").unwrap();
+                    fs::remove_file("./img_small.png").unwrap();
+                }
+                Err(e) => panic!("{}", e),
+            },
+            Err(e) => panic!("{}", e),
+        }
+    }
 
-    //    #[test]
-    //    fn upload_from_json_test() {
-    //        // TODO: не работает
-    //        let file = fs::read("./image.json").unwrap();
-    //        let (req, mut payload) = test::TestRequest::post().set_json(&file).to_http_parts();
-    //        println!("request created");
-    //        let res = test::block_on(Json::<ImageInJson>::from_request(&req, &mut payload)).unwrap();
-    //        println!("res created");
-    //        //        let json = Json::<ImageInJson>::from_request(&req, &mut actix_web::dev::Payload::None)
-    //        //            .wait()
-    //        //            .unwrap();
-    //        println!("json correct");
-    //        let resp = upload_from_json(res);
-    //        assert_eq!(resp.status(), http::StatusCode::OK);
-    //        // fs::remove_file("./img.png").unwrap();
-    //        // fs::remove_file("./img_small.png").unwrap();
-    //    }
+    // TODO: test is correct, but is not working
+    #[test]
+    fn upload_from_json_test() {
+        let file = fs::read("./image.json").unwrap();
+        let (req, mut payload) = test::TestRequest::post().set_json(&file).to_http_parts();
+        // FIXME: panicked at 'called `Result::unwrap()` on an `Err` value: Overflow
+        let res: Json<ImageInJson> =
+            test::block_on(Json::<ImageInJson>::from_request(&req, &mut payload)).unwrap();
+        let resp = upload_from_json(res);
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        fs::remove_file("./img.png").unwrap();
+        fs::remove_file("./img_small.png").unwrap();
+    }
 
-    //    #[test]
-    //    // TODO: add body
-    //    fn upload_from_multipart_test() {
-    //        let req = test::TestRequest::post().to_http_request();
-    //        let result = Multipart::from_request(&req, &mut actix_web::dev::Payload::None).unwrap();
-    //        let resp = upload_from_multipart(result).wait().unwrap();
-    //        assert_eq!(resp.status(), http::StatusCode::OK);
-    //        fs::remove_file("./img.png").unwrap();
-    //        fs::remove_file("./img_small.png").unwrap();
-    //        fs::remove_file("./img2.png").unwrap();
-    //        fs::remove_file("./img2_small.png").unwrap();
-    //    }
+    // TODO: test is not correct
+    #[test]
+    fn upload_from_multipart_test() {
+        let file = fs::read("./image.json").unwrap();
+        let bytes = Bytes::from(file);
+        let iter: std::iter::Once<Bytes> = std::iter::once(bytes);
+        let stream = futures::stream::iter_ok::<_, ()>(iter)
+            .map_err(|_| actix_http::error::PayloadError::Overflow);
+        let mut header = HeaderMap::new();
+        header.append(
+            HeaderName::from_static("Content-Type"),
+            HeaderValue::from_static("multipart/form-data"),
+        );
+        header.append(
+            HeaderName::from_static("Content-Disposition"),
+            HeaderValue::from_static("form-data; name=\"img\"; filename=\"img.jpg\""),
+        );
+        let multipart = Multipart::new(&header, stream);
+        let resp = test::block_on(upload_from_multipart(multipart)).unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        fs::remove_file("./img.png").unwrap();
+        fs::remove_file("./img_small.png").unwrap();
+    }
 
+    // TODO: test is correct, but is not working
     #[test]
     fn upload_from_url_test() {
         let body = BodyWithUrl {
-            // url: "https://itprojects.management/img/leading-team.jpg".to_string(),
-            url: "http://passtransit.ru/upload/logo.png".to_string(),
+            url: "https://itprojects.management/img/leading-team.jpg".to_string(),
         };
-        println!("step 1");
         let form = Form(body);
-        println!("step 2");
         let fut = upload_from_url(form);
-        println!("step 3");
+        // FIXME: SpawnError { is_shutdown: true }
         let resp = test::block_on(fut).unwrap();
-        println!("step 4");
         assert_eq!(resp.status(), http::StatusCode::OK);
-        //        fs::remove_file("./img.png").unwrap();
-        //        fs::remove_file("./img_small.png").unwrap();
+        fs::remove_file("./img.png").unwrap();
+        fs::remove_file("./img_small.png").unwrap();
     }
 }
