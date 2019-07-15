@@ -7,4 +7,4 @@ services:
     environment:
       - RUST_LOG=info
     volumes:
-      - "$(pwd)/images:/usr/local/bin/images"
+      - "$PWD/images:/usr/local/bin/images"
