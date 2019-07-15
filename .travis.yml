@@ -10,14 +10,11 @@ services:
 before_deploy: "./build-release trlogic ${TRAVIS_TAG}-${TRAVIS_OS_NAME}"
 deploy:
   provider: releases
-  api_key:
-    secure: "..."
+#  api_key:
+#    secure: ""
   file_glob: true
-  file: "myapp-${TRAVIS_TAG}-${TRAVIS_OS_NAME}.*"
+  file: "trlogic-${TRAVIS_TAG}-${TRAVIS_OS_NAME}.*"
   skip_cleanup: true
   on:
     rust: stable
     tags: true
-matrix:
-  allow_failures:
-    - rust: nightly

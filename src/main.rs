@@ -155,11 +155,11 @@ fn main() {
             .route("/upload-from-json", post().to(upload_from_json))
             .route("/upload-from-url", post().to_async(upload_from_url))
     })
-    .bind("127.0.0.1:8080")
+    .bind("0.0.0.0:8080")
     .unwrap()
     .run();
     match server {
-        Ok(_) => {}
+        Ok(_) => info!("server started in port: 8080"),
         Err(e) => error!(target: "main", "{}", e),
     }
 }

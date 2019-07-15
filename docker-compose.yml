@@ -1,9 +1,10 @@
 version: '0.1'
 services:
   trlogic:
+    build: .
     ports:
       - "8080:8080"
     environment:
       - RUST_LOG=info
-#    volumes:
-#      - "$(pwd):/home/rust/src"
+    volumes:
+      - "$(pwd)/images:/usr/local/bin/images"
