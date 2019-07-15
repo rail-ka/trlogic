@@ -4,7 +4,7 @@ os:
   - linux
   - osx
 rust:
-  - "1.36"
+  - "1.36.0"
 services:
   - docker
 before_deploy: "./build-release trlogic ${TRAVIS_TAG}-${TRAVIS_OS_NAME}"
